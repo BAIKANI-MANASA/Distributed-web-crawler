@@ -36,7 +36,7 @@ from app.services.stats import collect_stats
 router = APIRouter(dependencies=[Depends(rate_limit)])
 
 
-@router.post("/api/auth/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+@router.post("/auth/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 def register(payload: UserCreate, db: Session = Depends(get_db)) -> User:
     if payload.role == UserRole.ADMIN and db.query(User).filter(User.role == UserRole.ADMIN).count() > 0:
         raise HTTPException(status_code=403, detail="Only the first admin can self-register")
