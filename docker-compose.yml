@@ -1,0 +1,181 @@
+services:
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+    ports:
+      - "2181:2181"
+
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+
+    depends_on:
+      - zookeeper
+
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+
+    environment:
+      KAFKA_BROKER_ID: 1
+
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 9092 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+
+
+  redis:
+    image: redis:7-alpine
+
+    ports:
+      - "6379:6379"
+
+    command: ["redis-server", "--appendonly", "yes"]
+
+    volumes:
+      - redis_data:/data
+
+
+  postgres:
+    image: postgres:16-alpine
+
+    environment:
+      POSTGRES_DB: crawler
+      POSTGRES_USER: crawler
+      POSTGRES_PASSWORD: crawler
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crawler -d crawler"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+
+    ports:
+      - "9200:9200"
+
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+
+
+  backend:
+    build: ./backend
+
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+      kafka:
+        condition: service_healthy
+
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+
+    environment:
+      DATABASE_URL: postgresql://crawler:crawler@postgres:5432/crawler
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      REDIS_URL: redis://redis:6379/0
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      CRAWL_TOPIC: crawl-requests
+      SEARCH_TOPIC: search-events
+      JWT_SECRET_KEY: change-this-secret-in-production
+      CORS_ORIGINS: http://localhost:5173,http://localhost:8080
+
+    ports:
+      - "8000:8000"
+
+    volumes:
+      - backend_uploads:/app/uploads
+
+
+  crawler:
+    build: ./crawler
+
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+      backend:
+        condition: service_started
+
+    environment:
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      REDIS_URL: redis://redis:6379/0
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      CRAWL_TOPIC: crawl-requests
+
+    restart: unless-stopped
+
+    deploy:
+      replicas: 1
+
+
+  frontend:
+    build: ./frontend
+
+    depends_on:
+      - backend
+
+    ports:
+      - "5173:80"
+
+
+  nginx:
+    image: nginx:1.27-alpine
+
+    depends_on:
+      - backend
+      - frontend
+
+    ports:
+      - "8080:80"
+
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+
+
+volumes:
+  es_data:
+  redis_data:
+  postgres_data:
+  backend_uploads:
