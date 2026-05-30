@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     app_name: str = "AI WebCrawler Search"
     api_prefix: str = "/api"
     environment: str = "development"
-    cors_origins: str = "http://localhost:5173,http://localhost:8080"
+    cors_origins: str = "CORS_ORIGINS=http://localhost:5173,http://localhost:8080,https://distributed-web-crawler.vercel.app"
 
     elasticsearch_url: str = "http://elasticsearch:9200"
     elasticsearch_index: str = "web_pages"
