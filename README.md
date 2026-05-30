@@ -1,6 +1,6 @@
 # AI WebCrawler Search
 
-A full-stack, AI-flavored distributed web search engine built with React, Vite, Tailwind CSS, FastAPI, Elasticsearch, Kafka, Redis, aiohttp, and BeautifulSoup.
+A production-oriented, distributed web search stack designed for real-world deployments. Built with React, Vite, Tailwind CSS, FastAPI, Elasticsearch, Kafka, Redis, aiohttp, and BeautifulSoup.
 
 ## Features
 
@@ -23,9 +23,11 @@ docker/     Elasticsearch mapping and sample data
 nginx/      Reverse proxy config
 ```
 
-## Quick Start
+## Quick Start (local development)
 
-1. Copy environment examples if you want to customize values:
+Prerequisites: Docker Desktop (or podman), Git, and basic familiarity with Docker Compose.
+
+1. Copy environment examples and adjust secrets/services as needed:
 
 ```bash
 cp backend/.env.example backend/.env
@@ -33,16 +35,16 @@ cp crawler/.env.example crawler/.env
 cp frontend/.env.example frontend/.env
 ```
 
-2. Start the stack:
+2. Build and start the stack (development):
 
 ```bash
 docker compose up --build
 ```
 
-3. Open the app:
+3. Access services:
 
-- Frontend through Nginx: http://localhost:8080
-- Frontend container directly: http://localhost:5173
+- Frontend (via Nginx): http://localhost:8080
+- Frontend (dev server): http://localhost:5173
 - API docs: http://localhost:8000/docs
 - Elasticsearch: http://localhost:9200
 
@@ -101,10 +103,13 @@ pip install -r requirements.txt
 python worker.py
 ```
 
-## Production Notes
+## Production guidance
 
-- Change `ADMIN_TOKEN`, tighten CORS, and add real auth before exposing admin operations publicly.
-- Run multiple crawler replicas for higher throughput.
-- Put Elasticsearch, Kafka, and Redis behind managed services for production resilience.
-- The current summarization is extractive and local; plug an LLM summarizer into `crawler/extractor.py` if abstractive summaries are required.
-- Add HTTPS termination, observability, and persistent backups for production deployments.
+- Security: replace default tokens, enable HTTPS termination (TLS), enforce strong authentication and RBAC for admin APIs, and restrict CORS to trusted origins.
+- Reliability: run Elasticsearch, Kafka, and Redis on managed or clustered deployments with persistent storage and backups.
+- Scaling: horizontally scale crawler workers and backend replicas behind a load balancer; use partitioned Kafka topics and consumer groups for throughput.
+- Observability: integrate metrics (Prometheus), tracing (OpenTelemetry), and centralized logs (ELK/EFK) for performance and error monitoring.
+- Data hygiene: enable URL deduplication, robots.txt respect, rate limiting for politeness, and document versioning in Elasticsearch.
+- Extensibility: replace the local extractive summarizer with an external LLM service in crawler/extractor.py for abstractive summaries; add content classification and toxicity filtering where needed.
+
+Follow cloud provider best practices for networking, secrets management, and IAM when deploying to production.
